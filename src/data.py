@@ -61,33 +61,37 @@ def download_data(
         DataFrame with columns: Open_time, open, high, low, close, volume, Close_time
         or None if download fails.
     """
-    try:
-        url = (
-            f"https://api.binance.com/api/v3/klines"
-            f"?symbol={symbol}&interval={interval}&limit={limit}"
-        )
-        if end_ms:
-            url += f"&endTime={end_ms}"
+    url = (
+        f"https://api.binance.com/api/v3/klines"
+        f"?symbol={symbol}&interval={interval}&limit={limit}"
+    )
+    if end_ms:
+        url += f"&endTime={end_ms}"
 
-        r = requests.get(url, timeout=8)
-        r.raise_for_status()
+    for attempt in range(3):
+        try:
+            r = requests.get(url, timeout=20)
+            r.raise_for_status()
 
-        df = pd.DataFrame(
-            r.json(),
-            columns=[
-                "Open_time", "open", "high", "low", "close", "volume",
-                "Close_time", "qav", "num_trades", "taker_base", "taker_quote", "ignore",
-            ],
-        )
-        for col in ["open", "high", "low", "close", "volume"]:
-            df[col] = df[col].astype(float)
-        df["Open_time"]  = df["Open_time"].astype(int)
-        df["Close_time"] = df["Close_time"].astype(int)
-        return df.reset_index(drop=True)
+            df = pd.DataFrame(
+                r.json(),
+                columns=[
+                    "Open_time", "open", "high", "low", "close", "volume",
+                    "Close_time", "qav", "num_trades", "taker_base", "taker_quote", "ignore",
+                ],
+            )
+            for col in ["open", "high", "low", "close", "volume"]:
+                df[col] = df[col].astype(float)
+            df["Open_time"]  = df["Open_time"].astype(int)
+            df["Close_time"] = df["Close_time"].astype(int)
+            return df.reset_index(drop=True)
 
-    except Exception as e:
-        print(f"  ⚠️  Data error [{symbol} {interval}]: {e}")
-        return None
+        except Exception as e:
+            print(f"  ⚠️  Data error [{symbol} {interval}] attempt {attempt+1}/3: {e}")
+            if attempt < 2:
+                time.sleep(3)
+
+    return None
 
 
 # ── Higher-timeframe trend ─────────────────────────────────────────
